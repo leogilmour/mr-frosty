@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Sidewalk Plotter Control</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  </head>
+  <body>
+    <div class="topnav">
+      <h3>Sidewalk Plotter Control</h3>
+    </div>
+    <div class="content">
+      <canvas
+        id="canvas"
+        width="500"
+        height="500"
+        style="border: 1px solid black"
+      >
+        Your browser does not support the HTML 5 Canvas.
+      </canvas>
+      <br />
+      <button onclick="{drawACircle()}">Draw a circle</button>
+      <button onclick="{writeHelloWorld()}">Write Hello World</button>
+      <button onclick="{clearCanvas()}">Clear canvas</button>
+      <form>
+        <label for="steps_x">X Position:</label>
+        <input type="number" id="steps_x" name="steps_x" />
+        <br /><br />
+        <label for="steps_y">Y Position:</label>
+        <input type="number" id="steps_y" name="steps_y" />
+      </form>
+      <br />
+      <button onclick="submitForm()">GO!</button>
+      <label class="switch">
+        <input type="checkbox" onclick="togglePen()" />
+        <span class="slider round">Pen Down</span>
+      </label>
+    </div>
+  </body>
+
+  <script>
+    var gateway = `ws://${window.location.hostname}/ws`;
+    // var websocket;
+    window.addEventListener("load", onload);
+    var dir;
+    var pointsX = [];
+    var pointsY = [];
+    var penDown = 0;
+
+    var canvas = document.querySelector("canvas"),
+      ctx = canvas.getContext("2d");
+
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "red";
+
+    function submitForm() {
+      var steps_x = document.getElementById("steps_x").value;
+      var steps_y = document.getElementById("steps_y").value;
+      console.log(steps_x + "&" + steps_y);
+      websocket.send(steps_x + "&" + steps_y);
+    }
+
+    //report the mouse position on click
+    canvas.addEventListener(
+      "click",
+      function (evt) {
+        var mousePos = getMousePos(canvas, evt);
+        if (penDown == 0) {
+          pointsX.pop();
+          pointsY.pop();
+        }
+
+        pointsX.push(mousePos.x);
+        pointsY.push(mousePos.y);
+
+        console.log(mousePos.x + "&" + mousePos.y + "-" + penDown);
+        websocket.send(mousePos.x + "&" + mousePos.y + "-" + penDown);
+        ctx.beginPath();
+        for (var i = 0; i < pointsX.length; i++) {
+          ctx.lineTo(pointsX[i], pointsY[i]);
+        }
+        ctx.stroke();
+      },
+      false
+    );
+
+    //Get Mouse Position
+    function getMousePos(canvas, evt) {
+      var rect = canvas.getBoundingClientRect();
+      return {
+        x: evt.clientX - rect.left,
+        y: evt.clientY - rect.top,
+      };
+    }
+
+    function togglePen() {
+      if (penDown == 0) {
+        penDown = 1;
+      } else {
+        penDown = 0;
+      }
+      console.log(penDown);
+    }
+
+    function onload(event) {
+      //   initWebSocket();
+    }
+
+    function initWebSocket() {
+      console.log("Trying to open a WebSocket connection…");
+      websocket = new WebSocket(gateway);
+      websocket.onopen = onOpen;
+      websocket.onclose = onClose;
+      websocket.onmessage = onMessage;
+    }
+
+    function onOpen(event) {
+      console.log("Connection opened");
+    }
+
+    function onClose(event) {
+      console.log("Connection closed");
+      //   setTimeout(initWebSocket, 2000);
+    }
+
+    function onMessage(event) {
+      console.log(event.data);
+    }
+
+    function clearCanvas() {
+      const canvas = document.getElementById("canvas");
+      const context = canvas.getContext("2d");
+      context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+    }
+
+    function drawACircle() {
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+      ctx.beginPath();
+      ctx.arc(ctx.canvas.width / 2, ctx.canvas.height / 2, 30, 0, 2 * Math.PI);
+      ctx.stroke();
+    }
+
+    function writeHelloWorld() {
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+
+      ctx.font = "10px Georgia";
+      ctx.fillText("Hello World", 10, 80);
+    }
+  </script>
+</html>
