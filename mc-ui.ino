@@ -3,13 +3,7 @@
 #include <ESPAsyncWebServer.h>
 #include <AccelStepper.h>
 
-// Define a stepper and the pins it will use
-//AccelStepper stepper_X1(1, 9, 10); // initialise accelstepper for a two wire board
-//AccelStepper stepper_X2(1, 11, 12); // initialise accelstepper for a two wire board
-//AccelStepper stepper_Y(1, 13, 14); // initialise accelstepper for a two wire board
-
-AccelStepper stepper_X1(1, 2, 4); // initialise accelstepper for a two wire board
-AccelStepper stepper_X2(1, 5, 18); // initialise accelstepper for a two wire board
+AccelStepper stepper_X(1, 2, 4); // initialise accelstepper for a two wire board
 AccelStepper stepper_Y(1, 19, 21); // initialise accelstepper for a two wire board
 
 // Replace with your network credentials
@@ -205,11 +199,8 @@ void setup() {
 
   server.begin();
 
-  stepper_X1.setMaxSpeed(1000.0);
-  stepper_X1.setAcceleration(1000.0);
-
-  stepper_X2.setMaxSpeed(1000.0);
-  stepper_X2.setAcceleration(1000.0);
+  stepper_X.setMaxSpeed(1000.0);
+  stepper_X.setAcceleration(1000.0);
 
   stepper_Y.setMaxSpeed(1000.0);
   stepper_Y.setAcceleration(1000.0);
@@ -217,8 +208,7 @@ void setup() {
 
 void loop() {
   if (newRequest) {
-    stepper_X1.moveTo(steps_X.toInt());
-    stepper_X2.moveTo(steps_X.toInt());
+    stepper_X.moveTo(steps_X.toInt());
     stepper_Y.moveTo(steps_Y.toInt());
     Serial.println("new");
     Serial.println(steps_X.toInt());
@@ -226,12 +216,11 @@ void loop() {
     ws.cleanupClients();
   }
 
-  if (stepper_X1.distanceToGo() == 0 && stepper_Y.distanceToGo() == 0) {
+  if (stepper_X.distanceToGo() == 0 && stepper_Y.distanceToGo() == 0) {
     //Serial.println("done");
   }
 
-  stepper_X1.run();
-  stepper_X2.run();
+  stepper_X.run();
   stepper_Y.run();
   
 }
