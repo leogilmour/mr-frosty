@@ -4,10 +4,21 @@
 #include <ArduinoJson.h>
 #include <AccelStepper.h>
 
-String machine_state = "OFF";
+enum machine_state {
+  OFF,
+  ICE,
+  CALIBRATE
+};
+machine_state currentState = OFF;
 
 int xSwitchState = LOW;
 int ySwitchState = LOW;
+
+int xLimitSwitchPin = 3;
+int yLimitSwitchPin = 5;
+
+bool reset_x = false;
+bool reset_y = false;
 
 // X STEPPER
 AccelStepper stepper_X(1, 2, 4); // initialise accelstepper for a two wire board
@@ -41,9 +52,6 @@ JsonDocument doc;
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
-
-// Variables to save values from HTML form
-bool newRequest = false;
 
 JsonArray x_vals;
 JsonArray y_vals;
@@ -161,17 +169,14 @@ const char index_html[] PROGMEM = R"rawliteral(
         initWebSocket();
       }
       function formatSend() {
-
-
-
         let coords = generateCircleXY();
-        //let drawing_xy = x.map((x, i) => ({x: x, y: y[i]}));
-        console.log(JSON.stringify(coords));
-        websocket.send(JSON.stringify(coords));
+        // let drawing_xy = x.map((x, i) => ({x: x, y: y[i]}));
+        console.log(JSON.stringify({mode:"ice", xy: coords}));
+        websocket.send(JSON.stringify({mode:"ice", xy: coords}));
       }
       function calibrate() {
         websocket.send(
-          JSON.stringify({ type: "calibrate", xy: { x: 0, y: 0 } })
+          JSON.stringify({ mode: "calibrate", xy: { x: 0, y: 0 } })
         );
       }
 
@@ -326,15 +331,28 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
         Serial.println(error.f_str());
         return;
     }
+    String mode_string = doc["mode"].as<String>();
+    Serial.println(mode_string);
+    if (mode_string == "ice") {
+      currentState = ICE;
+    } else if (mode_string == "calibrate") {
+      currentState = CALIBRATE;
+    } else {
+      currentState = OFF;
+    }
     
-    x_vals = doc["x"];
-    y_vals = doc["y"];
-
-
-    newRequest = true;
+    x_vals = doc["xy"]["x"];
+    Serial.println("X values received:");
+    for (JsonVariant v : x_vals) {
+      Serial.println(v.as<String>());
+    }
+    y_vals = doc["xy"]["y"];
+    Serial.println("Y values received:");
+    for (JsonVariant v : y_vals) {
+      Serial.println(v.as<String>());
+    }
   }
 }
-
 
 void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
   switch (type) {
@@ -359,7 +377,6 @@ void initWebSocket() {
   server.addHandler(&ws);
 }
 
-
 String processor(const String& var) {
   Serial.println("PROCESSOR");
   Serial.println(var);
@@ -368,7 +385,6 @@ String processor(const String& var) {
   }
   return String();
 }
-
 
 void setup() {
   // Serial port for debugging purposes
@@ -390,17 +406,7 @@ void setup() {
   stepper_Y.setSpeed(y_speed);
   stepper_Y.setMaxSpeed(y_speed);
   stepper_Y.setAcceleration(y_accel);
-
-  // Start the very first movement immediately
-  Serial.println("Starting 2 revolutions clockwise (initial move)...");
-  stepper.moveTo(stepsPerRevolution * 2);
-  lastXMoveFinishedMillis = millis(); // Initialize to ensure the first wait period is correct
-  currentXMoveStep = 0;               // Set to indicate the first move is in progress
-  lastYMoveFinishedMillis = millis(); // Initialize to ensure the first wait period is correct
-  currentYMoveStep = 0;               // Set to indicate the first move is in progress
 }
-
-
 
 void runXStepperForCalibration()
 {
@@ -427,12 +433,11 @@ void calibration()
       Serial.println("STOP THE STEPPER MOTOR");
       stepper_X.stop();
       Serial.println("now X COORDINATE is 0");
-      x_stepper_coord = 0;
       stepper_X.setCurrentPosition(0);
       reset_x = false;
       if (reset_y == false)
       {
-        requestCalibrate = false;
+        machine_state = OFF;
         ws.cleanupClients();
       }
     }
@@ -446,15 +451,14 @@ void calibration()
     }
     else
     {
-      digitalWrite(yLed, HIGH);
       Serial.println("STOP THE STEPPER MOTOR");
+      stepper_Y.stop();
       Serial.println("now Y COORDINATE is 0");
-      y_stepper_coord = 0;
       stepper_Y.setCurrentPosition(0);
       reset_y = false;
       if (reset_x == false)
       {
-        requestCalibrate = false;
+        machine_state = OFF;
         ws.cleanupClients();
       }
     }
@@ -467,19 +471,19 @@ void icing() {
 
   if (stepper_X.distanceToGo() == 0 && stepper_Y.distanceToGo() == 0) {
     if (x_vals.size() == 0 && y_vals.size() == 0) {
-      newRequest = false;
+      machine_state = OFF;
       ws.cleanupClients();
       return;
     }
     if (x_vals.size() > 0) {
       next_x = x_vals[0];
       x_vals.remove(0);
-      stepper_X.moveTo(next_x.toInt());
+      stepper_X.moveTo(next_x);
     }
     if (y_vals.size() > 0) {
       next_y = y_vals[0];
       y_vals.remove(0);
-      stepper_Y.moveTo(next_y.toInt());
+      stepper_Y.moveTo(next_y);
     }
   }
 }
@@ -488,20 +492,14 @@ void loop()
 {
   switch (machine_state)
   {
-  case "CALIBRATE":
+  case CALIBRATE:
     calibration();
     break;
-  case "ICE":
-    /* code */
+  case ICE:
+    icing();
     break;
-  case "OFF":
+  case OFF:
   default:
     break;
-  }
-}
-
-void loop() {
-  if (newRequest) {
-    icing();
   }
 }
