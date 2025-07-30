@@ -1,151 +1,234 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Sidewalk Plotter Control</title>
+    <title>Circle selector</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <style>
+      html {
+        font-family: Arial, Helvetica, sans-serif;
+        text-align: center;
+      }
+      body {
+        margin: 0;
+      }
+      .content {
+        padding: 30px;
+        max-width: 90vw;
+        margin: 0 auto;
+      }
+    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
   </head>
   <body>
-    <div class="topnav">
-      <h3>Sidewalk Plotter Control</h3>
-    </div>
     <div class="content">
-      <canvas
-        id="canvas"
-        width="500"
-        height="500"
-        style="border: 1px solid black"
+      <button
+        onclick="calibrate()"
+        style="
+          border: 2px solid rgb(255, 111, 0);
+          background: rgba(255, 111, 0, 0.6);
+          padding: 10px;
+          margin: 10px;
+          cursor: pointer;
+          border-radius: 4px;
+          display: block;
+        "
       >
-        Your browser does not support the HTML 5 Canvas.
-      </canvas>
+        Calibrate to (0,0)
+      </button>
       <br />
-      <button onclick="{drawACircle()}">Draw a circle</button>
-      <button onclick="{writeHelloWorld()}">Write Hello World</button>
-      <button onclick="{clearCanvas()}">Clear canvas</button>
-      <form>
-        <label for="steps_x">X Position:</label>
-        <input type="number" id="steps_x" name="steps_x" />
-        <br /><br />
-        <label for="steps_y">Y Position:</label>
-        <input type="number" id="steps_y" name="steps_y" />
+      <form id="pointsForm" accept-charset="utf-8">
+        <label for="cx">Center (x)</label>
+        <input
+          type="text"
+          id="cx"
+          name="cx"
+          value="0.5"
+          onchange="myDrawing.updatePoints()"
+        />
+        <label for="cy">Center (y)</label>
+        <input
+          type="text"
+          id="cy"
+          name="cy"
+          value="0.5"
+          onchange="myDrawing.updatePoints()"
+        />
+        <label for="c_rad">Radius</label>
+        <input
+          type="text"
+          id="c_rad"
+          name="c_rad"
+          value="100"
+          onchange="myDrawing.updatePoints()"
+        />
+        <label for="n_steps">Steps</label>
+        <input
+          type="text"
+          id="n_steps"
+          name="n_steps"
+          value="10"
+          onchange="myDrawing.updatePoints()"
+        />
+
+        <button type="button" onclick="formatSend();">Draw</button>
       </form>
-      <br />
-      <button onclick="submitForm()">GO!</button>
-      <label class="switch">
-        <input type="checkbox" onclick="togglePen()" />
-        <span class="slider round">Pen Down</span>
-      </label>
+      <div style="display: flex; justify-content: center; align-items: center">
+        <div
+          id="pointsSvg"
+          style="height: 100vh; width: 100vh; text-align: center"
+        ></div>
+      </div>
     </div>
-  </body>
-
-  <script>
-    var gateway = `ws://${window.location.hostname}/ws`;
-    // var websocket;
-    window.addEventListener("load", onload);
-    var dir;
-    var pointsX = [];
-    var pointsY = [];
-    var penDown = 0;
-
-    var canvas = document.querySelector("canvas"),
-      ctx = canvas.getContext("2d");
-
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = "red";
-
-    function submitForm() {
-      var steps_x = document.getElementById("steps_x").value;
-      var steps_y = document.getElementById("steps_y").value;
-      console.log(steps_x + "&" + steps_y);
-      websocket.send(steps_x + "&" + steps_y);
-    }
-
-    //report the mouse position on click
-    canvas.addEventListener(
-      "click",
-      function (evt) {
-        var mousePos = getMousePos(canvas, evt);
-        if (penDown == 0) {
-          pointsX.pop();
-          pointsY.pop();
-        }
-
-        pointsX.push(mousePos.x);
-        pointsY.push(mousePos.y);
-
-        console.log(mousePos.x + "&" + mousePos.y + "-" + penDown);
-        websocket.send(mousePos.x + "&" + mousePos.y + "-" + penDown);
-        ctx.beginPath();
-        for (var i = 0; i < pointsX.length; i++) {
-          ctx.lineTo(pointsX[i], pointsY[i]);
-        }
-        ctx.stroke();
-      },
-      false
-    );
-
-    //Get Mouse Position
-    function getMousePos(canvas, evt) {
-      var rect = canvas.getBoundingClientRect();
-      return {
-        x: evt.clientX - rect.left,
-        y: evt.clientY - rect.top,
-      };
-    }
-
-    function togglePen() {
-      if (penDown == 0) {
-        penDown = 1;
-      } else {
-        penDown = 0;
+    <script>
+      var gateway = `ws://${window.location.hostname}/ws`;
+      var websocket;
+      window.addEventListener("load", onLoad);
+      function initWebSocket() {
+        console.log("Trying to open a WebSocket connection...");
+        websocket = new WebSocket(gateway);
+        websocket.onopen = onOpen;
+        websocket.onclose = onClose;
+        websocket.onmessage = onMessage; // <-- add this line
       }
-      console.log(penDown);
-    }
+      function onOpen(event) {
+        console.log("Connection opened");
+      }
+      function onClose(event) {
+        console.log("Connection closed");
+        setTimeout(initWebSocket, 2000);
+      }
+      function onMessage(event) {
+        console.log(event.data);
+      }
 
-    function onload(event) {
-      //   initWebSocket();
-    }
+      function onLoad(event) {
+        initWebSocket();
+      }
+      function formatSend() {
+        let coords = generateCircleXY();
+        //let drawing_xy = x.map((x, i) => ({x: x, y: y[i]}));
+        console.log(JSON.stringify(coords));
+        websocket.send(JSON.stringify(coords));
+      }
+      function calibrate() {
+        websocket.send(
+          JSON.stringify({ type: "calibrate", xy: { x: 0, y: 0 } })
+        );
+      }
 
-    function initWebSocket() {
-      console.log("Trying to open a WebSocket connection…");
-      websocket = new WebSocket(gateway);
-      websocket.onopen = onOpen;
-      websocket.onclose = onClose;
-      websocket.onmessage = onMessage;
-    }
+      function generateCircleXY() {
+        let form = document.getElementById("pointsForm");
+        let formData = new FormData(form);
+        let data = {};
+        formData.forEach((value, key) => {
+          data[key] = value;
+        });
 
-    function onOpen(event) {
-      console.log("Connection opened");
-    }
+        let theta_steps = Array.from(
+          { length: +data.n_steps },
+          (v, i) => ((2 * Math.PI) / +data.n_steps) * i
+        );
+        let x_vals = theta_steps.map(
+          (x) => +data.c_rad * Math.cos(x) + 550 * +data.cx
+        );
+        let y_vals = theta_steps.map(
+          (x) => +data.c_rad * Math.sin(x) + 550 * +data.cy
+        );
+        x_vals.forEach(function (x, i) {
+          x_vals[i] = parseFloat(x.toFixed(3));
+        });
+        y_vals.forEach(function (x, i) {
+          y_vals[i] = parseFloat(x.toFixed(3));
+        });
+        return { x: x_vals, y: y_vals };
+      }
+    </script>
+    <!-- d3 -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://d3js.org/d3-array.v2.min.js"></script>
 
-    function onClose(event) {
-      console.log("Connection closed");
-      //   setTimeout(initWebSocket, 2000);
-    }
+    <script>
+      class drawPoints {
+        constructor(parentElement, coords) {
+          this.parentElement = parentElement;
+          this.coords = coords;
 
-    function onMessage(event) {
-      console.log(event.data);
-    }
+          this.initVis();
+        }
 
-    function clearCanvas() {
-      const canvas = document.getElementById("canvas");
-      const context = canvas.getContext("2d");
-      context.clearRect(0, 0, context.canvas.width, context.canvas.height);
-    }
+        initVis() {
+          let vis = this;
 
-    function drawACircle() {
-      const canvas = document.getElementById("canvas");
-      const ctx = canvas.getContext("2d");
-      ctx.beginPath();
-      ctx.arc(ctx.canvas.width / 2, ctx.canvas.height / 2, 30, 0, 2 * Math.PI);
-      ctx.stroke();
-    }
+          // Margin convention
+          let parentWidth = 550;
+          let parentHeight = 550;
+          vis.pointSize = 2;
 
-    function writeHelloWorld() {
-      const canvas = document.getElementById("canvas");
-      const ctx = canvas.getContext("2d");
+          vis.margin = { top: 0, right: 0, bottom: 0, left: 0 };
 
-      ctx.font = "10px Georgia";
-      ctx.fillText("Hello World", 10, 80);
-    }
-  </script>
+          vis.width = parentWidth - vis.margin.left - vis.margin.right;
+          vis.height = parentHeight - vis.margin.top - vis.margin.bottom;
+
+          // SVG drawing area
+          vis.svg = d3
+            .select(`#${vis.parentElement}`)
+            .append("svg")
+            .attr("width", vis.width + vis.margin.left + vis.margin.right)
+            .attr("height", vis.height + vis.margin.top + vis.margin.bottom)
+            .append("g")
+            .attr(
+              "transform",
+              "translate(" + vis.margin.left + "," + vis.margin.top + ")"
+            );
+
+          vis.drawingPoints();
+        }
+
+        updatePoints() {
+          let vis = this;
+
+          let { x, y } = generateCircleXY();
+          let newPoints = x.map((x, i) => ({ x: x, y: y[i] }));
+
+          vis.coords = newPoints;
+
+          vis.drawingPoints();
+        }
+
+        drawingPoints() {
+          let vis = this;
+
+          vis.xyPoints = vis.svg.selectAll(".points").data(vis.coords);
+
+          vis.xyPoints.exit().remove();
+
+          vis.xyPoints
+            .enter()
+            .append("circle")
+            .attr("class", "points")
+            .attr("fill", "black")
+            .attr("r", vis.pointSize)
+            .attr("stroke-width", 1)
+            .attr("stroke", "black")
+            .merge(vis.xyPoints)
+            .attr("cx", (d) => d.x)
+            .attr("cy", (d) => d.y);
+        }
+      }
+
+      let init_form = document.getElementById("pointsForm");
+      let init_formData = new FormData(init_form);
+      let init_data = {};
+      init_formData.forEach((value, key) => {
+        init_data[key] = value;
+      });
+
+      let { x, y } = generateCircleXY(init_data);
+      let drawing_xy = x.map((x, i) => ({ x: x, y: y[i] }));
+      console.log(drawing_xy);
+      let myDrawing = new drawPoints("pointsSvg", drawing_xy);
+    </script>
+  </body>
 </html>
