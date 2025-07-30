@@ -4,12 +4,12 @@
 #include <ArduinoJson.h>
 #include <AccelStepper.h>
 
-AccelStepper stepper_X(1, 2, 4);   // initialise accelstepper for a two wire board
+AccelStepper stepper_X(1, 2, 4); // initialise accelstepper for a two wire board
 AccelStepper stepper_Y(1, 19, 21); // initialise accelstepper for a two wire board
 
-// Network credentials
-const char *ssid = "MAKERS";
-const char *password = "123456789";
+// Replace with your network credentials
+const char* ssid = "MAKERSPACE";
+const char* password = "12345678";
 
 String message = "";
 // Allocate the JSON document
@@ -19,11 +19,19 @@ JsonDocument doc;
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
-// Variables to save values from HTML form
+//Variables to save values from HTML form
 String steps_X;
 String steps_Y;
-int penDown = 0;
+
+JsonArray x_vals; 
+JsonArray y_vals; 
+int coords_pos = 0;
+int next_x = 0;
+int next_y = 0;
+
+int penDown = 0; 
 bool newRequest = false;
+
 
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML><html>
@@ -215,13 +223,11 @@ const char index_html[] PROGMEM = R"rawliteral(
 )rawliteral";
 
 // Initialize WiFi
-void initWiFi()
-{
+void initWiFi() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   Serial.println("Connecting to WiFi ..");
-  while (WiFi.status() != WL_CONNECTED)
-  {
+  while (WiFi.status() != WL_CONNECTED) {
     Serial.println('.');
     delay(1000);
   }
@@ -229,95 +235,75 @@ void initWiFi()
 }
 
 // Having trouble receiving larger messages with this. it receives but doesn't satify if statement for ? reason
-void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
-{
-  AwsFrameInfo *info = (AwsFrameInfo *)arg;
+void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
+  AwsFrameInfo *info = (AwsFrameInfo*)arg;
   Serial.println("received");
-  if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT)
-  {
+  if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
     Serial.println("here");
     data[len] = 0;
-    message = (char *)data;
+    message = (char*)data;
     Serial.println(message);
 
     // this is from ArduinoJson docs (https://arduinojson.org/v7/example/parser/)
-    const char *json = (char *)data;
+    const char* json = (char*) data;
     // Deserialize the JSON document
     DeserializationError error = deserializeJson(doc, json);
     // Test if parsing succeeds.
-    if (error)
-    {
-      Serial.print(F("deserializeJson() failed: "));
-      Serial.println(error.f_str());
-      return;
+    if (error) {
+        Serial.print(F("deserializeJson() failed: "));
+        Serial.println(error.f_str());
+        return;
     }
+    
+    x_vals = doc["x"];
+    y_vals = doc["y"];
 
-    // Change strings back to array of floats
-    JsonArray x_vals = doc["x"];
-    float firstVal = x_vals[0];
-    Serial.println(firstVal); //<-- ok so they're in there, just println can't handle the JsonArray object
-
-    /*
-    steps_X = message.substring(0, message.indexOf("&"));
-    steps_Y = message.substring(message.indexOf("&") + 1, message.indexOf("-"));
-    penDown = message.substring(message.indexOf("-") + 1, message.length()).toInt();
-    Serial.println("steps_X: ");
-    Serial.println(steps_X);
-    Serial.println("steps_Y: ");
-    Serial.println(steps_Y);
-    Serial.println("pen down: ");
-    Serial.println(penDown);*/
     newRequest = true;
   }
 }
 
-void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len)
-{
-  switch (type)
-  {
-  case WS_EVT_CONNECT:
-    Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
-    // Notify client of motor current state when it first connects
-    break;
-  case WS_EVT_DISCONNECT:
-    Serial.printf("WebSocket client #%u disconnected\n", client->id());
-    break;
-  case WS_EVT_DATA:
-    handleWebSocketMessage(arg, data, len);
-    break;
-  case WS_EVT_PONG:
-  case WS_EVT_ERROR:
-    break;
+void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
+  switch (type) {
+    case WS_EVT_CONNECT:
+      Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
+      //Notify client of motor current state when it first connects
+      break;
+    case WS_EVT_DISCONNECT:
+      Serial.printf("WebSocket client #%u disconnected\n", client->id());
+      break;
+    case WS_EVT_DATA:
+      handleWebSocketMessage(arg, data, len);
+      break;
+    case WS_EVT_PONG:
+    case WS_EVT_ERROR:
+      break;
   }
 }
 
-void initWebSocket()
-{
+void initWebSocket() {
   ws.onEvent(onEvent);
   server.addHandler(&ws);
 }
 
-String processor(const String &var)
-{
+String processor(const String& var) {
   Serial.println("PROCESSOR");
   Serial.println(var);
-  if (var == "STATE")
-  {
+  if (var == "STATE") {
     return "OFF";
   }
   return String();
 }
 
-void setup()
-{
+void setup() {
   // Serial port for debugging purposes
   Serial.begin(115200);
   initWiFi();
   initWebSocket();
 
   // Route for root / web page
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-            { request->send_P(200, "text/html", index_html, processor); });
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send_P(200, "text/html", index_html, processor);
+  });
 
   server.begin();
 
@@ -328,23 +314,32 @@ void setup()
   stepper_Y.setAcceleration(1000.0);
 }
 
-void loop()
-{
-  if (newRequest)
-  {
-    stepper_X.moveTo(steps_X.toInt());
-    stepper_Y.moveTo(steps_Y.toInt());
-    Serial.println("new");
-    Serial.println(steps_X.toInt());
-    newRequest = false;
-    ws.cleanupClients();
-  }
-
-  if (stepper_X.distanceToGo() == 0 && stepper_Y.distanceToGo() == 0)
-  {
-    // Serial.println("done");
-  }
-
+void icing() {
   stepper_X.run();
   stepper_Y.run();
+
+  if (stepper_X.distanceToGo() == 0 && stepper_Y.distanceToGo() == 0) {
+    if (x_vals.size() == 0 && y_vals.size() == 0) {
+      newRequest = false;
+      ws.cleanupClients();
+      return;
+    }
+    if (x_vals.size() > 0) {
+      next_x = x_vals[0];
+      x_vals.remove(0);
+      stepper_X.moveTo(next_x.toInt());
+    }
+    if (y_vals.size() > 0) {
+      next_y = y_vals[0];
+      y_vals.remove(0);
+      stepper_Y.moveTo(next_y.toInt());
+    }
+  }
+}
+
+void loop() {
+  if (newRequest) {
+    icing();
+  }
+
 }
