@@ -3,6 +3,7 @@
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include <AccelStepper.h>
+#include <ESPmDNS.h>
 
 enum machine_state {
   OFF,
@@ -309,6 +310,11 @@ void initWiFi()
     delay(1000);
   }
   Serial.println(WiFi.localIP());
+    // Start mDNS
+  if (!MDNS.begin("mrfrosty"))
+  {
+    Serial.println("Error setting up MDNS responder!");
+  }
 }
 
 // Having trouble receiving larger messages with this. it receives but doesn't satify if statement for ? reason
@@ -437,7 +443,7 @@ void calibration()
       reset_x = false;
       if (reset_y == false)
       {
-        machine_state = OFF;
+        currentState = OFF;
         ws.cleanupClients();
       }
     }
@@ -458,7 +464,7 @@ void calibration()
       reset_y = false;
       if (reset_x == false)
       {
-        machine_state = OFF;
+        currentState = OFF;
         ws.cleanupClients();
       }
     }
@@ -471,7 +477,7 @@ void icing() {
 
   if (stepper_X.distanceToGo() == 0 && stepper_Y.distanceToGo() == 0) {
     if (x_vals.size() == 0 && y_vals.size() == 0) {
-      machine_state = OFF;
+      currentState = OFF;
       ws.cleanupClients();
       return;
     }
@@ -490,7 +496,7 @@ void icing() {
 
 void loop()
 {
-  switch (machine_state)
+  switch (currentState)
   {
   case CALIBRATE:
     calibration();
