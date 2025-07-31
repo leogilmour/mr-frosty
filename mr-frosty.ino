@@ -13,6 +13,18 @@ enum machine_state
 };
 machine_state currentState = OFF;
 
+enum icing_state
+{
+  IDLE,
+  STOPPING,
+  SQUEEZING
+};
+
+icing_state currentIcingState = IDLE;
+
+bool logMessage = true;
+String logString = "";
+
 int xSwitchState = LOW;
 int ySwitchState = LOW;
 
@@ -62,6 +74,10 @@ AsyncWebSocket ws("/ws");
 
 JsonArray x_vals;
 JsonArray y_vals;
+
+JsonArray xy_figures;
+JsonArray x_figures;
+JsonArray y_figures;
 
 int next_x = 0;
 int next_y = 0;
@@ -184,18 +200,18 @@ const char index_html[] PROGMEM = R"rawliteral(
         websocket.send(JSON.stringify({mode:"ice", xy: coords}));
       }
       function lineX() {
-        let coords = {x: [1, 2, 3, 4, 5], y: [0, 0, 0, 0, 0]}
+        let coords = {x: [[1, 2, 3, 4, 5]], y: [[0, 0, 0, 0, 0]]}
         console.log(JSON.stringify({mode:"ice", xy: coords}));
         websocket.send(JSON.stringify({mode:"ice", xy: coords}));
       }
       function lineY() {
-        let coords = {x: [0, 0, 0, 0, 0], y:[1, 2, 3, 4, 5]}
+        let coords = {x: [[0, 0, 0, 0, 0]], y:[[1, 2, 3, 4, 5]]}
         console.log(JSON.stringify({mode:"ice", xy: coords}));
         websocket.send(JSON.stringify({mode:"ice", xy: coords}));
       }
       function calibrate() {
         websocket.send(
-          JSON.stringify({ mode: "calibrate", xy: { x: 0, y: 0 } })
+          JSON.stringify({ mode: "calibrate", xy: { x: [[0]], y: [[0]] } })
         );
       }
 
@@ -225,7 +241,8 @@ const char index_html[] PROGMEM = R"rawliteral(
         });
         x_vals.push(x_vals[0]);
         y_vals.push(y_vals[0]);
-        return { x: x_vals, y: y_vals };
+        // TODO: First x-array is circle, second x-array is centrepoint... but how to make it hover there?
+        return { x: [x_vals, [data.cx]], y: [y_vals, [data.cy]] };
       }
     </script>
     <!-- d3 -->
@@ -379,15 +396,22 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
       currentState = OFF;
     }
 
-    x_vals = doc["xy"]["x"];
-    Serial.println("X values received:");
-    for (JsonVariant v : x_vals)
+    // make DRAWING arrays nested
+    xy_figures = doc["xy"];
+    Serial.println("XY values received:");
+    for (JsonVariant v : xy_figures)
     {
       Serial.println(v.as<String>());
     }
-    y_vals = doc["xy"]["y"];
+    x_figures = doc["xy"]["x"];
+    Serial.println("X values received:");
+    for (JsonVariant v : x_figures)
+    {
+      Serial.println(v.as<String>());
+    }
+    y_figures = doc["xy"]["y"];
     Serial.println("Y values received:");
-    for (JsonVariant v : y_vals)
+    for (JsonVariant v : y_figures)
     {
       Serial.println(v.as<String>());
     }
@@ -468,9 +492,10 @@ void runYStepperForCalibration()
 
 void calibration()
 {
-  Serial.println("lets calibrate");
+  logString = "lets calibrate";
   xSwitchState = digitalRead(xLimitSwitchPin);
   ySwitchState = digitalRead(yLimitSwitchPin);
+  currentIcingState = IDLE;
 
   if (reset_x == true)
   {
@@ -515,9 +540,25 @@ void calibration()
   }
 }
 
+void penDown()
+{
+  // run icing stepper motor
+}
+
+void penUp()
+{
+  // ideally reverse a step.
+  // once finished, set currentIcingState to IDLE
+}
+
+void penStop()
+{
+  // stop icing stepper motor.
+}
+
 void icing()
 {
-  Serial.println("lets ice");
+  logString = "lets ice";
   stepper_X.run();
   stepper_Y.run();
 
@@ -525,15 +566,47 @@ void icing()
   {
     if (x_vals.size() == 0 && y_vals.size() == 0)
     {
-      currentState = OFF;
-      ws.cleanupClients();
-      return;
+      currentIcingState = STOPPING;
+      // TO DO, IT SHOULD MOVE TO FIRST COORDINATE WITHOUT ICING...
+      // could use a bool to switch between first x val?
+
+      // Check for any figures
+      if (x_figures.size() > 0)
+      {
+        Serial.println("x_vals PRE remove");
+        Serial.println(x_vals);
+        Serial.println("x_figures PRE remove");
+        Serial.println(x_figures);
+        x_vals = x_figures[0];
+        y_vals = y_figures[0];
+        x_figures.remove(0);
+        y_figures.remove(0);
+        Serial.println("x_vals:");
+        Serial.println(x_vals);
+        Serial.println("x_figures:");
+        Serial.println(x_figures);
+      }
+      else
+      {
+        // CHECK FOR NEXT ARRAY OF DRAWING
+        currentState = OFF;
+        currentIcingState = IDLE;
+        ws.cleanupClients();
+        return;
+      }
     }
+    else
+    {
+      currentIcingState = SQUEEZING;
+    }
+
     if (x_vals.size() > 0)
     {
       next_x = x_vals[0];
       x_vals.remove(0);
       stepper_X.moveTo(next_x);
+      Serial.println("Stepper moving to next_x:");
+      Serial.println(next_x);
     }
     if (y_vals.size() > 0)
     {
@@ -556,11 +629,40 @@ void loop()
     break;
   case OFF:
   default:
+    logString = "Default/off state";
     break;
   }
-  if (millis() % 5000 == 0)
+
+  switch (currentIcingState)
   {
-    Serial.println("We are in:");
-    Serial.println(currentState);
+  case STOPPING:
+    // Stop the icing process, maybe reverse a step
+    penUp();
+    break;
+  case SQUEEZING:
+    // Start the icing process
+    penDown();
+    break;
+  case IDLE:
+  default:
+    // Handle unexpected states
+    penStop();
+    break;
+  }
+
+  // STATUS LOGGING
+  if (millis() % 10000 == 0)
+  {
+    if (logMessage)
+    {
+      Serial.println("We are in:");
+      Serial.println(currentState);
+      Serial.println(logString);
+      logMessage = false;
+    }
+  }
+  else
+  {
+    logMessage = true;
   }
 }
