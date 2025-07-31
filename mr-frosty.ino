@@ -5,7 +5,8 @@
 #include <AccelStepper.h>
 #include <ESPmDNS.h>
 
-enum machine_state {
+enum machine_state
+{
   OFF,
   ICE,
   CALIBRATE
@@ -28,8 +29,8 @@ int dirYPin = 19;
 
 // X STEPPER
 AccelStepper stepper_X(AccelStepper::DRIVER, stepXPin, dirXPin); // initialise accelstepper for a two wire board
-int x_speed = 1000;              // speed in steps per second
-int x_accel = 500;               // acceleration in steps per second squared
+int x_speed = 1000;                                              // speed in steps per second
+int x_accel = 500;                                               // acceleration in steps per second squared
 // --- Timing Variables for delays between moves ---
 unsigned long lastXMoveFinishedMillis = 0;
 // --- Sequence Management Variables ---
@@ -37,8 +38,8 @@ int currentXMoveStep = 0; // Tracks which movement in the sequence we are perfor
 
 // Y STEPPER
 AccelStepper stepper_Y(AccelStepper::DRIVER, stepYPin, dirYPin); // initialise accelstepper for a two wire board
-int y_speed = 1000;                // speed in steps per second
-int y_accel = 500;                 // acceleration in steps per second squared
+int y_speed = 1000;                                              // speed in steps per second
+int y_accel = 500;                                               // acceleration in steps per second squared
 unsigned long lastYMoveFinishedMillis = 0;
 int currentYMoveStep = 0; // Tracks which movement in the sequence we are performing
 
@@ -48,8 +49,8 @@ const int stepsPerRevolution = 200; // For a 1.8 degree motor (full steps)
 const long delayBetweenMoves = 3000; // Time in ms to wait after one move finishes before starting the next
 
 // Replace with your network credentials
-const char* ssid = "MAKERSPACE";
-const char* password = "12345678";
+const char *ssid = "MAKERSPACE";
+const char *password = "12345678";
 
 String message = "";
 // Allocate the JSON document
@@ -330,7 +331,7 @@ void initWiFi()
     delay(1000);
   }
   Serial.println(WiFi.localIP());
-    // Start mDNS
+  // Start mDNS
   if (!MDNS.begin("mrfrosty"))
   {
     Serial.println("Error setting up MDNS responder!");
@@ -338,102 +339,117 @@ void initWiFi()
 }
 
 // Having trouble receiving larger messages with this. it receives but doesn't satify if statement for ? reason
-void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
+void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
+{
   Serial.println("handleWSM");
-  AwsFrameInfo *info = (AwsFrameInfo*)arg;
+  AwsFrameInfo *info = (AwsFrameInfo *)arg;
   Serial.println("received");
-  if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
+  if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT)
+  {
     Serial.println("here");
     data[len] = 0;
-    message = (char*)data;
+    message = (char *)data;
     Serial.println(message);
 
     // this is from ArduinoJson docs (https://arduinojson.org/v7/example/parser/)
-    const char* json = (char*) data;
+    const char *json = (char *)data;
     // Deserialize the JSON document
     DeserializationError error = deserializeJson(doc, json);
     // Test if parsing succeeds.
-    if (error) {
-        Serial.print(F("deserializeJson() failed: "));
-        Serial.println(error.f_str());
-        return;
+    if (error)
+    {
+      Serial.print(F("deserializeJson() failed: "));
+      Serial.println(error.f_str());
+      return;
     }
     String mode_string = doc["mode"].as<String>();
     Serial.println(mode_string);
-    if (mode_string == "ice") {
+    if (mode_string == "ice")
+    {
       currentState = ICE;
-    } else if (mode_string == "calibrate") {
+    }
+    else if (mode_string == "calibrate")
+    {
       currentState = CALIBRATE;
       reset_x = true;
       reset_y = true;
-    } else {
+    }
+    else
+    {
       currentState = OFF;
     }
-    
+
     x_vals = doc["xy"]["x"];
     Serial.println("X values received:");
-    for (JsonVariant v : x_vals) {
+    for (JsonVariant v : x_vals)
+    {
       Serial.println(v.as<String>());
     }
     y_vals = doc["xy"]["y"];
     Serial.println("Y values received:");
-    for (JsonVariant v : y_vals) {
+    for (JsonVariant v : y_vals)
+    {
       Serial.println(v.as<String>());
     }
   }
 }
 
-void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
+void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len)
+{
   Serial.println("onEvent");
-  switch (type) {
-    case WS_EVT_CONNECT:
-      Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
-      //Notify client of motor current state when it first connects
-      break;
-    case WS_EVT_DISCONNECT:
-      Serial.printf("WebSocket client #%u disconnected\n", client->id());
-      break;
-    case WS_EVT_DATA:
-      handleWebSocketMessage(arg, data, len);
-      break;
-    case WS_EVT_PONG:
-    case WS_EVT_ERROR:
-      break;
+  switch (type)
+  {
+  case WS_EVT_CONNECT:
+    Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
+    // Notify client of motor current state when it first connects
+    break;
+  case WS_EVT_DISCONNECT:
+    Serial.printf("WebSocket client #%u disconnected\n", client->id());
+    break;
+  case WS_EVT_DATA:
+    handleWebSocketMessage(arg, data, len);
+    break;
+  case WS_EVT_PONG:
+  case WS_EVT_ERROR:
+    break;
   }
 }
 
-void initWebSocket() {
+void initWebSocket()
+{
   Serial.println("initWS");
   ws.onEvent(onEvent);
   server.addHandler(&ws);
 }
 
-String processor(const String& var) {
+String processor(const String &var)
+{
   Serial.println("PROCESSOR");
   Serial.println(var);
-  if (var == "STATE") {
+  if (var == "STATE")
+  {
     return "OFF";
   }
   return String();
 }
 
-void setup() {
+void setup()
+{
   // Serial port for debugging purposes
   Serial.begin(115200);
   initWiFi();
   initWebSocket();
 
   // Route for root / web page
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
-    request->send_P(200, "text/html", index_html, processor);
-  });
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+            { request->send_P(200, "text/html", index_html, processor); });
 
   server.begin();
 
   stepper_X.setMaxSpeed(x_speed);
   stepper_X.setAcceleration(x_accel);
   stepper_X.setSpeed(x_speed);
-  
+
   stepper_Y.setSpeed(y_speed);
   stepper_Y.setMaxSpeed(y_speed);
   stepper_Y.setAcceleration(y_accel);
@@ -499,23 +515,28 @@ void calibration()
   }
 }
 
-void icing() {
+void icing()
+{
   Serial.println("lets ice");
   stepper_X.run();
   stepper_Y.run();
 
-  if (stepper_X.distanceToGo() == 0 && stepper_Y.distanceToGo() == 0) {
-    if (x_vals.size() == 0 && y_vals.size() == 0) {
+  if (stepper_X.distanceToGo() == 0 && stepper_Y.distanceToGo() == 0)
+  {
+    if (x_vals.size() == 0 && y_vals.size() == 0)
+    {
       currentState = OFF;
       ws.cleanupClients();
       return;
     }
-    if (x_vals.size() > 0) {
+    if (x_vals.size() > 0)
+    {
       next_x = x_vals[0];
       x_vals.remove(0);
       stepper_X.moveTo(next_x);
     }
-    if (y_vals.size() > 0) {
+    if (y_vals.size() > 0)
+    {
       next_y = y_vals[0];
       y_vals.remove(0);
       stepper_Y.moveTo(next_y);
@@ -537,7 +558,8 @@ void loop()
   default:
     break;
   }
-  if (millis() % 5000 == 0) {
+  if (millis() % 5000 == 0)
+  {
     Serial.println("We are in:");
     Serial.println(currentState);
   }
