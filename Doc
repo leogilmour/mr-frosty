@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<title>PHYS S-12: Intro to Digital Fabrication </title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="../style.css" rel="stylesheet">
+
+
+<nav class="navbar navbar-expand-sm navbar-dark" style=" color: #EEE7E8;">
+  <div style="align-items: center; justify-content: center;" class="container-fluid">
+    <div class="flexrow">
+      <h1 class="nav-title">PHYS S-12: Summer 2025</h1>
+    </div>
+    <div class="navbar-nav">
+      <h4><a class="nav-link" href="../index.html">Home</a></h4>
+      <h4><a class="nav-link" href="../about.html">About</a></h4>
+    </div>
+  </div>
+</nav>
+
+<body>
+<xmp style="display:none;">
+<div class="textcontainer">
+<p class="margin">   </p>
+
+<h3>Weeks 5.2-7: Machine Building</h3>
+
+<h4>Assignment: Build a Drawing Robot</h4>
+For this assignment, Leo, Emma, Nick, and I created a drawing robot that extruded frosting. The setup included 3 stepper motors, a syringe, a 3-D printed syringe holder, as well as various pre-given components that included a metal guide rail and 3-D printed holding components. Our largest challenges arose when trying to merge all 3 stepper motors to function in unison. First, when trying to calibrate the x-axis, the stepper motor would vibrate uncontrolably and cause the mechanism to not move along the x-axis. However, after debugging the issue, we discovered that the incorrect pin was used—alleviating the issue. 
+<br>
+<br>
+Afterwards, our next challenge was having the stepper motor drive the syringe in way that caused a constant extrusion of the frosting. Similar to the previous challenge, our stepper motor would also vibrate and not cause any rotation. However, we discovered the issue lied within the code itself, and not from the hardware. Therefore, we recoded the function which led to a constant torque being applied to the syringe. 
+<br>
+<br>
+Once we compiled all of the code, we conducted a test-run to see how the drawing mechanism behaves when commanded to draw a circle or letter 'X' and 'Y'. As a result, although the drawing mechanism did indeed follow drawing coordinates, we saw the image produced was an oval rather than circle. In addition, the oval appeared to have rigid borders, which we determined was an issue caused by the circle ratio function in the code. Below are the results of the initial test run. 
+<div class="center-colum">
+      <img src="./test.jpeg" alt="LED" width="900"> 
+<br>
+<br>
+After determining the stepper motors and code functions, we tried incorporting the limit switches into the circuit. However, when trying to do so, either the limit switches or the code for the limit switches caused the previous x-and-y-axes code to malfunction. 
+<br>
+<br>
+The major breakthrough occured when trying to calibrate the drawing mechanism. Once we determined that the mechanism should be pushed into the zero position, we took the coordinates of the position and implemented it into the code. Once we had it draw a straight line of 50x50 pixels in each x-and-y direction, the distance was measured and divded among each other to create a ratio. The ratio resulted in a circle, rather than an oval. Moreover, the actual coordinates were first tested using a pen and paper. Below are video demonstrations of the drawing mechanism working with a pen—it was able to draw multiple circles and write "PS 70." 
+<video controls>
+      <source src="1.mp4" type="video/mp4" size="50">
+           </video> 
+        <video controls>
+        <source src="2.mp4" type="video/mp4" size="100">
+               </video> 
+          <video controls>
+          <source src="3.mp4" type="video/mp4" size="100">
+               </video> 
+            <video controls>
+            <source src="4.mp4" type="video/mp4" size="100">
+             </video> 
+<br>
+<br>
+The final challenge was implementing the syringe and icing to the drawing mechanism. We encountered yet another issue with the syringe stepper motor whereby the motor wasn't driving the syringe pump. Therefore, we determined to manually press the syringe to extract the frosting. Here is the final product using the icing. 
+<div class="center-colum">
+      <img src="./final.jpeg" alt="LED" width="900"> 
+</div>
+</xmp>
+</body>
+
+<script src="../strapdown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" ></script>
+
+</html>
