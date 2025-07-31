@@ -108,13 +108,15 @@
       }
       function formatSend() {
         let coords = generateCircleXY();
-        //let drawing_xy = x.map((x, i) => ({x: x, y: y[i]}));
-        console.log(JSON.stringify(coords));
-        websocket.send(JSON.stringify(coords));
+        // let drawing_xy = x.map((x, i) => ({x: x, y: y[i]}));
+        console.log(JSON.stringify({ mode: "ice", xy: coords }));
+        websocket.send(JSON.stringify({ mode: "ice", xy: coords }));
       }
       function calibrate() {
+        console.log(JSON.stringify({ mode: "calibrate", xy: { x: 0, y: 0 } }));
+        // Send a message to the server to calibrate to (0,0)
         websocket.send(
-          JSON.stringify({ type: "calibrate", xy: { x: 0, y: 0 } })
+          JSON.stringify({ mode: "calibrate", xy: { x: 0, y: 0 } })
         );
       }
 

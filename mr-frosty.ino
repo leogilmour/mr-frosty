@@ -21,8 +21,13 @@ int yLimitSwitchPin = 5;
 bool reset_x = false;
 bool reset_y = false;
 
+int stepXPin = 26;
+int dirXPin = 25;
+int stepYPin = 18;
+int dirYPin = 19;
+
 // X STEPPER
-AccelStepper stepper_X(1, 2, 4); // initialise accelstepper for a two wire board
+AccelStepper stepper_X(AccelStepper::DRIVER, stepXPin, dirXPin); // initialise accelstepper for a two wire board
 int x_speed = 1000;              // speed in steps per second
 int x_accel = 500;               // acceleration in steps per second squared
 // --- Timing Variables for delays between moves ---
@@ -31,7 +36,7 @@ unsigned long lastXMoveFinishedMillis = 0;
 int currentXMoveStep = 0; // Tracks which movement in the sequence we are performing
 
 // Y STEPPER
-AccelStepper stepper_Y(1, 19, 21); // initialise accelstepper for a two wire board
+AccelStepper stepper_Y(AccelStepper::DRIVER, stepYPin, dirYPin); // initialise accelstepper for a two wire board
 int y_speed = 1000;                // speed in steps per second
 int y_accel = 500;                 // acceleration in steps per second squared
 unsigned long lastYMoveFinishedMillis = 0;
@@ -137,6 +142,8 @@ const char index_html[] PROGMEM = R"rawliteral(
 
         <button type="button" onclick="formatSend();">Draw</button>
       </form>
+      <button type="button" onclick="lineX();">Draw X line</button>
+      <button type="button" onclick="lineY();">Draw Y line</button>
       <div style="display: flex; justify-content: center; align-items: center">
         <div
           id="pointsSvg"
@@ -175,6 +182,16 @@ const char index_html[] PROGMEM = R"rawliteral(
         console.log(JSON.stringify({mode:"ice", xy: coords}));
         websocket.send(JSON.stringify({mode:"ice", xy: coords}));
       }
+      function lineX() {
+        let coords = {x: [1, 2, 3, 4, 5], y: [0, 0, 0, 0, 0]}
+        console.log(JSON.stringify({mode:"ice", xy: coords}));
+        websocket.send(JSON.stringify({mode:"ice", xy: coords}));
+      }
+      function lineY() {
+        let coords = {x: [0, 0, 0, 0, 0], y:[1, 2, 3, 4, 5]}
+        console.log(JSON.stringify({mode:"ice", xy: coords}));
+        websocket.send(JSON.stringify({mode:"ice", xy: coords}));
+      }
       function calibrate() {
         websocket.send(
           JSON.stringify({ mode: "calibrate", xy: { x: 0, y: 0 } })
@@ -205,6 +222,8 @@ const char index_html[] PROGMEM = R"rawliteral(
         y_vals.forEach(function (x, i) {
           y_vals[i] = parseFloat(x.toFixed(3));
         });
+        x_vals.push(x_vals[0]);
+        y_vals.push(y_vals[0]);
         return { x: x_vals, y: y_vals };
       }
     </script>
@@ -300,6 +319,7 @@ const char index_html[] PROGMEM = R"rawliteral(
 // Initialize WiFi
 void initWiFi()
 {
+  Serial.println("initWiFi");
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   Serial.println("Connecting to WiFi ..");
@@ -319,6 +339,7 @@ void initWiFi()
 
 // Having trouble receiving larger messages with this. it receives but doesn't satify if statement for ? reason
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
+  Serial.println("handleWSM");
   AwsFrameInfo *info = (AwsFrameInfo*)arg;
   Serial.println("received");
   if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
@@ -343,6 +364,8 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
       currentState = ICE;
     } else if (mode_string == "calibrate") {
       currentState = CALIBRATE;
+      reset_x = true;
+      reset_y = true;
     } else {
       currentState = OFF;
     }
@@ -361,6 +384,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
 }
 
 void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
+  Serial.println("onEvent");
   switch (type) {
     case WS_EVT_CONNECT:
       Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
@@ -379,6 +403,7 @@ void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType 
 }
 
 void initWebSocket() {
+  Serial.println("initWS");
   ws.onEvent(onEvent);
   server.addHandler(&ws);
 }
@@ -416,15 +441,18 @@ void setup() {
 
 void runXStepperForCalibration()
 {
+  Serial.println("runX");
   stepper_X.runSpeed();
 }
 void runYStepperForCalibration()
 {
+  Serial.println("runY");
   stepper_Y.runSpeed();
 }
 
 void calibration()
 {
+  Serial.println("lets calibrate");
   xSwitchState = digitalRead(xLimitSwitchPin);
   ySwitchState = digitalRead(yLimitSwitchPin);
 
@@ -472,6 +500,7 @@ void calibration()
 }
 
 void icing() {
+  Serial.println("lets ice");
   stepper_X.run();
   stepper_Y.run();
 
@@ -507,5 +536,9 @@ void loop()
   case OFF:
   default:
     break;
+  }
+  if (millis() % 5000 == 0) {
+    Serial.println("We are in:");
+    Serial.println(currentState);
   }
 }
